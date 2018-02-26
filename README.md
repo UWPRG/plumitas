@@ -1,5 +1,5 @@
 ## plumitas
-[![Build Status](https://travis-ci.org/uwescience/shablona.svg?branch=master)](https://travis-ci.org/uwescience/shablona)
+[![Build Status](https://travis-ci.org/UWPRG/plumitas.svg?branch=master)](https://travis-ci.org/UWPRG/plumitas)
 
 Plumitas is a pythonic package for analysis and visualization of the output
 files from molecular dynamics (MD) performed with the open source enhanced
