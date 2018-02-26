@@ -1,7 +1,7 @@
 [run]
 branch = True
-source = shablona/*
-include = shablona/*
+source = plumitas/*
+include = plumitas/*
 omit = */setup.py
 [report]
-include = shablona/*
+include = plumitas/*
