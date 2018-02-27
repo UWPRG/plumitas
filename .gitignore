@@ -9,3 +9,4 @@ dist
 build/
 *.egg-info/
 .idea/
+build_dist.sh
