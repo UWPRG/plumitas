@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 import os.path as op
+import matplotlib.pyplot as plt
 
 import plumitas as plm
 
@@ -29,5 +30,8 @@ def test_make_2d_free_energy_surface():
     colvar_file = op.join(data_path, "mini_colvar")
     colvar_df = plm.read_colvar(colvar_file)
 
-    plm.make_2d_free_energy_surface(colvar_df,
-                                    colvar_df.columns[1], colvar_df.columns[2])
+    axis = plm.make_2d_free_energy_surface(colvar_df,
+                                           colvar_df.columns[1],
+                                           colvar_df.columns[2])
+
+    assert isinstance(axis, type(plt.gca()))

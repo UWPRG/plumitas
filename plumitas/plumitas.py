@@ -59,8 +59,8 @@ def read_hills(filename):
     return read_colvar(filename)
 
 
-def make_2d_free_energy_surface(df, x_column, y_column, bins=20, beta=0.4,
-                                clim=None, xlim=None, ylim=None):
+def make_2d_free_energy_surface(df, x, y, bins=20, beta=0.4,
+                                ax=None, clim=None, xlim=None, ylim=None):
     """
     Create a 2D FES from a COLVAR file with static 'pb.bias'. This function
     will be modularized and generalized, but I wanted to include something
@@ -72,38 +72,40 @@ def make_2d_free_energy_surface(df, x_column, y_column, bins=20, beta=0.4,
         DataFrame generated from Plumed COLVAR file. This DataFrame must
         have a column with static 'pb.bias' - most likely generated from
         `mdrun rerun` - and at two CVs.
-    x_column : string
+    x : string
         Name of one of the CVs (column name from df).
-    y_column : string
+    y : string
         Name of one of the CVs (column name from df).
     bins : int
         Number of bins in each dimension to segment histogram.
     beta : float
         1/(k_b * Temp)
+    ax : None
+        Axis to append contourf.
     clim : int
         Maximum free energy (in kJ/mol) for color bar.
-    xlim : list
+    xlim : tuple/list
         Limits for x axis in plot (i.e. [x_min, x_max]).
-    ylim : list
+    ylim : tuple/list
         Limits for y axis in plot (i.e. [y_min, y_max]).
 
     Returns
     -------
-    None
+    axes: matplotlib.AxesSubplot
     """
     df['wt'] = np.exp(beta * df.loc[:, 'pb.bias'])
     df['normWt'] = df.loc[:, 'wt'] / df.loc[:, 'wt'].sum()
 
-    x = df[x_column].values
-    y = df[y_column].values
+    x_data = df[x].values
+    y_data = df[y].values
     w = df['normWt'].values
 
-    xedges = np.linspace(x.min(), x.max(), bins)
-    yedges = np.linspace(y.min(), y.max(), bins)
+    x_edges = np.linspace(x_data.min(), x_data.max(), bins)
+    y_edges = np.linspace(y_data.min(), y_data.max(), bins)
 
-    hist, xedges, yedges = np.histogram2d(x, y,
-                                          bins=(xedges, yedges),
-                                          weights=w)
+    hist, x_edges, y_edges = np.histogram2d(x_data, y_data,
+                                            bins=(x_edges, y_edges),
+                                            weights=w)
     hist = hist.T
 
     hist = -np.log(hist) / beta
@@ -113,7 +115,10 @@ def make_2d_free_energy_surface(df, x_column, y_column, bins=20, beta=0.4,
     hist[high_hist] = 20
     hist = hist - hist.min()
 
-    plt.contourf(xedges[1:], yedges[1:], hist)
+    if ax is None:
+        ax = plt.gca()
+
+    plt.contourf(x_edges[1:], y_edges[1:], hist)
     cbar = plt.colorbar()
     plt.clim(0, clim)
     plt.set_cmap('viridis')
@@ -121,7 +126,7 @@ def make_2d_free_energy_surface(df, x_column, y_column, bins=20, beta=0.4,
 
     plt.xlim(xlim)
     plt.ylim(ylim)
-    plt.xlabel(x_column)
-    plt.ylabel(y_column)
-    plt.show()
-    return
+    plt.xlabel(x)
+    plt.ylabel(y)
+
+    return ax
