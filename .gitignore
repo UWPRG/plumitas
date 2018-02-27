@@ -5,3 +5,5 @@ _build/
 auto_examples/
 gen_api/
 .env
+sdist
+bdist_wheel

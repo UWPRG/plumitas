@@ -23,7 +23,8 @@ opts = dict(name=NAME,
             packages=PACKAGES,
             package_data=PACKAGE_DATA,
             install_requires=REQUIRES,
-            requires=REQUIRES)
+            requires=REQUIRES,
+            python_requires='~=3.6')
 
 
 if __name__ == '__main__':
