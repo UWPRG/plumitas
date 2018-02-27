@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 # from .due import due, Doi
 
-__all__ = ["read_colvar", "read_hills"]
+__all__ = ["read_colvar", "read_hills", "make_2d_free_energy_surface"]
 
 
 # Use duecredit (duecredit.org) to provide a citation to relevant work to
