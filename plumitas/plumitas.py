@@ -101,17 +101,17 @@ def make_2d_free_energy_surface(df, x_column, y_column,  bins=20, beta=0.4,
     xedges = np.linspace(x.min(), x.max(), bins)
     yedges = np.linspace(y.min(), y.max(), bins)
 
-    H, xedges, yedges = np.histogram2d(x, y, bins=(xedges, yedges), weights=w)
-    H = H.T
+    hist, xedges, yedges = np.histogram2d(x, y, bins=(xedges, yedges), weights=w)
+    hist = hist.T
 
-    H = -np.log(H) / beta
-    H = np.nan_to_num(H)
+    hist = -np.log(hist) / beta
+    hist = np.nan_to_num(hist)
 
-    high_H = H > 20
-    H[high_H] = 20
-    H = H - H.min()
+    high_hist = hist > 20
+    hist[high_hist] = 20
+    hist = hist - hist.min()
 
-    plt.contourf(xedges[1:], yedges[1:], H)
+    plt.contourf(xedges[1:], yedges[1:], hist)
     cbar = plt.colorbar()
     plt.clim(0, clim)
     plt.set_cmap('viridis')
