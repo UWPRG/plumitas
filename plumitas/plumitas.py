@@ -59,7 +59,7 @@ def read_hills(filename):
     return read_colvar(filename)
 
 
-def make_2d_free_energy_surface(df, x_column, y_column,  bins=20, beta=0.4,
+def make_2d_free_energy_surface(df, x_column, y_column, bins=20, beta=0.4,
                                 clim=None, xlim=None, ylim=None):
     """
     Create a 2D FES from a COLVAR file with static 'pb.bias'. This function
@@ -69,9 +69,9 @@ def make_2d_free_energy_surface(df, x_column, y_column,  bins=20, beta=0.4,
     Parameters
     ----------
     df : Pandas DataFrame
-        DataFrame generated from Plumed COLVAR file. This DataFrame must have a
-        column with static 'pb.bias' - most likely generated from `mdrun rerun` -
-        and at two CVs.
+        DataFrame generated from Plumed COLVAR file. This DataFrame must
+        have a column with static 'pb.bias' - most likely generated from
+        `mdrun rerun` - and at two CVs.
     x_column : string
         Name of one of the CVs (column name from df).
     y_column : string
@@ -101,7 +101,9 @@ def make_2d_free_energy_surface(df, x_column, y_column,  bins=20, beta=0.4,
     xedges = np.linspace(x.min(), x.max(), bins)
     yedges = np.linspace(y.min(), y.max(), bins)
 
-    hist, xedges, yedges = np.histogram2d(x, y, bins=(xedges, yedges), weights=w)
+    hist, xedges, yedges = np.histogram2d(x, y,
+                                          bins=(xedges, yedges),
+                                          weights=w)
     hist = hist.T
 
     hist = -np.log(hist) / beta
