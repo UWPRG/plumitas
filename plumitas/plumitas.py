@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division, print_function
-import os
-import numpy as np
-import pandas as pd
-#from .due import due, Doi
+# import os
+# import numpy as np
+# import pandas as pd
+# from .due import due, Doi
 
 __all__ = ["colvar_to_dataframe", "hills_to_dataframe"]
 
