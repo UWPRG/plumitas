@@ -5,7 +5,7 @@ from os.path import join as pjoin
 _version_major = 0
 _version_minor = 0
 _version_micro = 1  # use '' for first of series, number for 1 and above
-_version_extra = 'dev'
+_version_extra = 'dev1'
 # _version_extra = ''  # Uncomment this for full releases
 
 # Construct full version string from these.
@@ -32,8 +32,8 @@ long_description = """
 
 Plumitas
 ========
-To get started using these components in your own software, please go to the
-repository README_.
+Pythonic analysis and visualization of Plumed output files. For more
+info, please go to the repository README_.
 
 .. _README: https://github.com/UWPRG/plumitas/blob/master/README.md
 
