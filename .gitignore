@@ -10,3 +10,4 @@ build/
 *.egg-info/
 .idea/
 build_dist.sh
+.pytest_cache/

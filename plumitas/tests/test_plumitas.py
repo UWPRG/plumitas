@@ -6,21 +6,19 @@ import plumitas as plm
 data_path = op.join(plm.__path__[0], 'data')
 
 
-def test_read_colvar():
+def test_read_files():
     """
     Testing function to convert of COLVAR file to pandas DataFrame.
 
     """
+    colvar_file = op.join(data_path, "mini_colvar")
+    hills_file = op.join(data_path, "mini_hills")
 
-    pass
+    colvar_df = plm.read_colvar(colvar_file)
+    hills_df = plm.read_hills(hills_file)
 
-
-def test_read_hills():
-    """
-    Testing function to convert of HILLS file to pandas DataFrame.
-
-    """
-    pass
+    assert colvar_df is not None
+    assert hills_df is not None
 
 
 def test_make_2d_free_energy_surface():
@@ -28,4 +26,8 @@ def test_make_2d_free_energy_surface():
     Testing function to convert of HILLS file to pandas DataFrame.
 
     """
-    pass
+    colvar_file = op.join(data_path, "mini_colvar")
+    colvar_df = plm.read_colvar(colvar_file)
+
+    plm.make_2d_free_energy_surface(colvar_df,
+                                    colvar_df.columns[1], colvar_df.columns[2])
