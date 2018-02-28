@@ -30,8 +30,8 @@ def test_make_2d_free_energy_surface():
     colvar_df = plm.read_colvar(colvar_file)
 
     axis = plm.make_2d_free_energy_surface(colvar_df,
+                                           colvar_df.columns[0],
                                            colvar_df.columns[1],
-                                           colvar_df.columns[2],
                                            temp=300)
 
     assert axis
@@ -46,7 +46,7 @@ def test_potential_of_mean_force():
     colvar_df = plm.read_colvar(colvar_file)
 
     axis = plm.potential_of_mean_force(colvar_df,
-                                       colvar_df.columns[1],
+                                       colvar_df.columns,
                                        temp=300)
 
     assert axis
