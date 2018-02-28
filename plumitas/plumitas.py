@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-__all__ = ["read_colvar", "read_hills", "make_2d_free_energy_surface"]
+__all__ = ["read_colvar", "read_hills", "make_2d_free_energy_surface",
+           "potential_of_mean_force"]
 
 
 def read_colvar(filename):
@@ -49,8 +50,8 @@ def read_hills(filename):
     return read_colvar(filename)
 
 
-def make_2d_free_energy_surface(df, x, y, bins=20, beta=0.4,
-                                ax=None, clim=None, xlim=None, ylim=None):
+def make_2d_free_energy_surface(df, x, y, temp, weight='pb.bias', bins=20,
+                                clim=None, xlim=None, ylim=None):
     """
     Create a 2D FES from a COLVAR file with static 'pb.bias'. This function
     will be modularized and generalized, but I wanted to include something
@@ -68,10 +69,10 @@ def make_2d_free_energy_surface(df, x, y, bins=20, beta=0.4,
         Name of one of the CVs (column name from df).
     bins : int
         Number of bins in each dimension to segment histogram.
-    beta : float
-        1/(k_b * Temp)
-    ax : None
-        Axis to append contourf.
+    temp : float
+        Temperature of simulation which generated Plumed file.
+    weight : str
+        Name of static bias column.
     clim : int
         Maximum free energy (in kJ/mol) for color bar.
     xlim : tuple/list
@@ -83,19 +84,21 @@ def make_2d_free_energy_surface(df, x, y, bins=20, beta=0.4,
     -------
     axes: matplotlib.AxesSubplot
     """
-    df['wt'] = np.exp(beta * df.loc[:, 'pb.bias'])
-    df['normWt'] = df.loc[:, 'wt'] / df.loc[:, 'wt'].sum()
+    k = 8.314e-3
+    beta = 1 / (temp * k)
+    w = np.exp(beta * df.loc[:, weight])
+    normalized_weight = w / w.sum()
 
     x_data = df[x].values
     y_data = df[y].values
-    w = df['normWt'].values
+    hist_w = normalized_weight.values
 
     x_edges = np.linspace(x_data.min(), x_data.max(), bins)
     y_edges = np.linspace(y_data.min(), y_data.max(), bins)
 
     hist, x_edges, y_edges = np.histogram2d(x_data, y_data,
                                             bins=(x_edges, y_edges),
-                                            weights=w)
+                                            weights=hist_w)
     hist = hist.T
 
     hist = -np.log(hist) / beta
@@ -105,18 +108,46 @@ def make_2d_free_energy_surface(df, x, y, bins=20, beta=0.4,
     hist[high_hist] = 20
     hist = hist - hist.min()
 
-    if ax is None:
-        ax = plt.gca()
-
-    plt.contourf(x_edges[1:], y_edges[1:], hist)
+    ax = plt.contourf(x_edges[1:], y_edges[1:], hist)
     cbar = plt.colorbar()
     plt.clim(0, clim)
     plt.set_cmap('viridis')
-    cbar.ax.set_ylabel('weight [kJ/mol]')
+    cbar.ax.set_ylabel('A [kJ/mol]')
 
     plt.xlim(xlim)
     plt.ylim(ylim)
     plt.xlabel(x)
     plt.ylabel(y)
+
+    return ax
+
+
+def potential_of_mean_force(df, collective_variable,
+                            temp, weight='pb.bias', bins=20,
+                            xlim=None, ylim=None):
+    k = 8.314e-3
+    beta = 1 / (temp * k)
+    w = np.exp(beta * df.loc[:, weight])
+    normalized_weight = w / w.sum()
+
+    hist_x = df[collective_variable].values
+    hist_w = normalized_weight.values
+
+    x, y = np.histogram(hist_x, bins=bins, weights=hist_w)
+
+    x = -np.log(x) / beta
+    x = np.nan_to_num(x)
+
+    high_x = x > 50
+    x[high_x] = 50
+    x = x - x.min()
+
+    ax = plt.plot(y[:-1], x)
+    plt.set_cmap('viridis')
+
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    plt.xlabel(x)
+    plt.ylabel('A [kJ/mol]')
 
     return ax
