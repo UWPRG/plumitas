@@ -203,7 +203,6 @@ def potential_of_mean_force(df, collective_variables,
     if not weight:
         raise ValueError('You must supply frame weights to generate the FES.'
                          'Try using plumitas.get_frame_weights first.')
-    
     k = 8.314e-3
     beta = 1 / (temp * k)
 
