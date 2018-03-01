@@ -36,7 +36,8 @@ def test_make_2d_free_energy_surface():
                                       multi=number_of_replicas,
                                       unbiased=True)
     # overwrite weight column above with real, normalized weights
-    plm.get_frame_weights(multi_colvar_df, bias='pb.bias', temp=300)
+    plm.get_frame_weights(multi_colvar_df,
+                          static_bias='pb.bias', temp=300)
 
     # send over to 2D FES method
     axis = plm.make_2d_free_energy_surface(multi_colvar_df,
@@ -59,7 +60,8 @@ def test_potential_of_mean_force():
     colvar_file = op.join(data_path, "COLVAR")
     colvar_df = plm.read_colvar(colvar_file)
     # get normalized frame weights
-    plm.get_frame_weights(colvar_df, bias='pb.bias', temp=300)
+    plm.get_frame_weights(colvar_df,
+                          static_bias='pb.bias', temp=300)
     axis = plm.potential_of_mean_force(colvar_df,
                                        colvar_df.columns,
                                        weight='weight',

@@ -74,11 +74,15 @@ def read_hills(filename='HILLS'):
     return read_colvar(filename)
 
 
-def get_frame_weights(df, temp, bias):
+def get_frame_weights(df, temp, static_bias=None):
+    if not static_bias:
+        raise ValueError('You must supply a static bias column with the'
+                         '"static_bias" arg to get frame weights.')
+
     # calculate normalized weight
     k = 8.314e-3
     beta = 1 / (temp * k)
-    w = np.exp(beta * df.loc[:, bias])
+    w = np.exp(beta * df.loc[:, static_bias])
     df['weight'] = w / w.sum()
     return
 
@@ -117,6 +121,10 @@ def make_2d_free_energy_surface(df, x, y, temp, weight=None, bins=20,
     -------
     axes: matplotlib.AxesSubplot
     """
+    if not weight:
+        raise ValueError('You must supply frame weights to generate the FES.'
+                         'Try using plumitas.get_frame_weights first.')
+
     k = 8.314e-3
     beta = 1 / (temp * k)
 
@@ -192,6 +200,10 @@ def potential_of_mean_force(df, collective_variables,
     -------
     axes: matplotlib.AxesSubplot
     """
+    if not weight:
+        raise ValueError('You must supply frame weights to generate the FES.'
+                         'Try using plumitas.get_frame_weights first.')
+    
     k = 8.314e-3
     beta = 1 / (temp * k)
 
