@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 __all__ = ["read_colvar", "read_hills", "make_2d_free_energy_surface",
-           "potential_of_mean_force"]
+           "get_frame_weights", "potential_of_mean_force"]
 
 
 def read_colvar(filename='COLVAR', multi=0, unbiased=False):
@@ -74,7 +74,16 @@ def read_hills(filename='HILLS'):
     return read_colvar(filename)
 
 
-def make_2d_free_energy_surface(df, x, y, temp, weight='pb.bias', bins=20,
+def get_frame_weights(df, temp, bias):
+    # calculate normalized weight
+    k = 8.314e-3
+    beta = 1 / (temp * k)
+    w = np.exp(beta * df.loc[:, bias])
+    df['weight'] = w / w.sum()
+    return
+
+
+def make_2d_free_energy_surface(df, x, y, temp, weight=None, bins=20,
                                 clim=None, xlim=None, ylim=None):
     """
     Create a 2D FES from a COLVAR file with static 'pb.bias'. This function
@@ -108,15 +117,13 @@ def make_2d_free_energy_surface(df, x, y, temp, weight='pb.bias', bins=20,
     -------
     axes: matplotlib.AxesSubplot
     """
-    # calculate normalized weight
     k = 8.314e-3
     beta = 1 / (temp * k)
-    w = np.exp(beta * df.loc[:, weight])
-    normalized_weight = w / w.sum()
 
     # grab ndarray of values from df
     x_data = df[x].values
     y_data = df[y].values
+    w_data = df[weight].values
 
     # create bin edges
     x_edges = np.linspace(x_data.min(), x_data.max(), bins)
@@ -125,7 +132,7 @@ def make_2d_free_energy_surface(df, x, y, temp, weight='pb.bias', bins=20,
     # create weighted histogram, with weights converted to free energy
     hist, x_edges, y_edges = np.histogram2d(x_data, y_data,
                                             bins=(x_edges, y_edges),
-                                            weights=normalized_weight)
+                                            weights=w_data)
     hist = hist.T
     hist = -np.log(hist) / beta
     hist = np.nan_to_num(hist)
@@ -155,7 +162,7 @@ def make_2d_free_energy_surface(df, x, y, temp, weight='pb.bias', bins=20,
 
 
 def potential_of_mean_force(df, collective_variables,
-                            temp, weight='pb.bias', bins=100,
+                            temp, weight=None, bins=100,
                             xlim=None, ylim=None):
     """
     Create PMF plot for one or several collective variables.
@@ -187,12 +194,12 @@ def potential_of_mean_force(df, collective_variables,
     """
     k = 8.314e-3
     beta = 1 / (temp * k)
-    w = np.exp(beta * df.loc[:, weight])
-    normalized_weights = w / w.sum()
 
     # fresh AxesSubplot instance
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
+
+    w_data = df[weight].values
 
     # add lines for each CV
     for cv in collective_variables:
@@ -200,7 +207,7 @@ def potential_of_mean_force(df, collective_variables,
         x_data = df[cv].values
 
         # create weighted histogram, with weights converted to free energy
-        x, y = np.histogram(x_data, bins=bins, weights=normalized_weights)
+        x, y = np.histogram(x_data, bins=bins, weights=w_data)
         x = -np.log(x) / beta
         x = np.nan_to_num(x)
 
