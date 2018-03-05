@@ -10,6 +10,7 @@ Welcome to plumitas's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   source/plumitas
 
 
 Indices and tables
