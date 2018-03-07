@@ -1,21 +1,18 @@
-plumitas package
-================
+plumitas
+========
 
-Subpackages
------------
+API
+---
+.. toctree::
+
+    plumitas.core
+    plumitas.analysis
+    plumitas.visualization
+
+
+Testing
+-------
 
 .. toctree::
 
     plumitas.tests
-
-Submodules
-----------
-
-plumitas\.plumitas module
--------------------------
-
-.. automodule:: plumitas.plumitas
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
