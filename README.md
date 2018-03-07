@@ -14,3 +14,7 @@ and contributing to this project to come...
 
 Immediately significant information:
 - support planned for **`python 3.6+`** only.
+
+### API
+Checkout our documentation [here](http://plumitas.readthedocs.io/) for help
+getting started with the plumitas API!
