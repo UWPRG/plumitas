@@ -1,3 +1,4 @@
+import glob
 import os
 import re
 
@@ -73,7 +74,16 @@ def read_hills(filename='HILLS'):
     df : Pandas DataFrame
         CVs and bias as columns, time as index.
     """
-    return read_colvar(filename)
+    # find all files matching filename
+    all_hills = filename + '*'
+    hills_names = glob.glob(all_hills)
+
+    # parse each HILLS file with basic read_colvar call
+    hills_frames = [read_colvar(hill_file)
+                    for hill_file in hills_names]
+
+    # return dictionary of HILLS dataframes with CV name as key
+    return dict([(df.columns[0], df) for df in hills_frames])
 
 
 def parse_bias(filename='plumed.dat', method=None):
@@ -149,7 +159,13 @@ def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
     if not method:
         return SamplingProject(colvar, hills, **kwargs)
 
-    return
+    if method == 'MetaD':
+        return MetaDProject(colvar, hills, **kwargs)
+    elif method == 'PBMetaD':
+        return PBMetaDProject(colvar, hills, **kwargs)
+
+    raise KeyError('Sorry, the "{}" method is not yet supported.'
+                   .format(method))
 
 
 ##################################
@@ -158,7 +174,7 @@ def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
 
 
 class SamplingProject:
-    def __init__(self, colvar, hills, multi):
+    def __init__(self, colvar, hills, multi=False):
         self.method = None
         self.colvar = read_colvar(colvar, multi)
         self.hills = read_hills(hills)
