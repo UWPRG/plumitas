@@ -4,6 +4,11 @@ import re
 import pandas as pd
 
 
+##################################
+#### READ PLUMED OUTPUT FILES ####
+##################################
+
+
 def read_colvar(filename='COLVAR', multi=0, unbiased=False):
     """
     Function that takes experimental data and gives us the
@@ -115,3 +120,57 @@ def parse_bias(filename='plumed.dat', method=None):
     bias_args = dict(arguments)
 
     return bias_args
+
+
+def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
+    """
+
+    High-level function to read in all files associated with a Plumed
+    enhanced sampling project. **kwargs supplied since different project
+    types will be instantiated with different arguments.
+
+    Parameters
+    ----------
+    colvar : string
+        Name of the COLVAR file to read in.
+    hills : string
+        Name of the HILLS file to read in.
+    method : string
+        Name of enhanced sampling method used to bias the simulation.
+        Supported methods will include "MetaD", "PBMetaD", and others.
+        If the default None value is passed, plumitas will try to
+        create
+
+    Returns
+    -------
+    project : plumitas.SamplingProject
+        Project base class, or subclass if 'method' is specified.
+    """
+    if not method:
+        return SamplingProject(colvar, hills, **kwargs)
+
+    return
+
+
+##################################
+####  CORE PLUMITAS CLASSES   ####
+##################################
+
+
+class SamplingProject:
+    def __init__(self, colvar, hills, multi):
+        self.method = None
+        self.colvar = read_colvar(colvar, multi)
+        self.hills = read_hills(hills)
+        self.traj = None
+        self.biased_CVs = None
+        self.static_bias = None
+
+
+class MetaDProject(SamplingProject):
+    pass
+
+
+class PBMetaDProject(SamplingProject):
+    pass
+
