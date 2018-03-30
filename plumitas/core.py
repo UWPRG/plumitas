@@ -2,6 +2,7 @@ import glob
 import os
 import re
 
+import numpy as np
 import pandas as pd
 
 
@@ -179,8 +180,26 @@ class SamplingProject:
         self.colvar = read_colvar(colvar, multi)
         self.hills = read_hills(hills)
         self.traj = None
-        self.biased_CVs = None
-        self.static_bias = None
+        self.biased_CVs = [CV for CV in self.hills]
+        self.static_bias = {}
+
+    def reconstruct_bias_potential(self, sigma, grid_min, grid_max):
+        if not self.biased_CVs:
+            print('self.biased_CVs not set.')
+            return
+
+        for CV in self.hills:
+            n_bins = 5 * (grid_max - grid_min) / sigma
+            grid = np.linspace(grid_min, grid_max, num=n_bins)
+
+            s_i = self.hills[CV][CV].values
+            s_i = s_i.reshape(len(s_i), 1)
+            w_i = self.hills[CV]['height'].values
+            w_i = w_i.reshape(len(w_i), 1)
+
+            hill_values = get_hills(grid, s_i, sigma)
+
+            self.static_bias[CV] = sum(w_i * hill_values)
 
 
 class MetaDProject(SamplingProject):
@@ -189,4 +208,11 @@ class MetaDProject(SamplingProject):
 
 class PBMetaDProject(SamplingProject):
     pass
+
+
+def get_hills(grid_points, centers, sigma):
+    dist_from_center = grid_points - centers
+    square = np.square(dist_from_center)
+    exp = np.exp(-square / (2 * sigma * sigma))
+    return exp
 
