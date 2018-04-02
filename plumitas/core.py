@@ -6,10 +6,11 @@ import numpy as np
 import pandas as pd
 
 
+"""
 ##################################
 #### READ PLUMED OUTPUT FILES ####
 ##################################
-
+"""
 
 def read_colvar(filename='COLVAR', multi=0, unbiased=False):
     """
@@ -195,9 +196,11 @@ def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
                    .format(method))
 
 
-##################################
-####  CORE PLUMITAS CLASSES   ####
-##################################
+"""
+###############################
+#### CORE PLUMITAS CLASSES ####
+###############################
+"""
 
 
 class SamplingProject:
