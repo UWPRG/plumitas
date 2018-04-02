@@ -133,6 +133,32 @@ def parse_bias(filename='plumed.dat', method=None):
     return bias_args
 
 
+def get_hills(grid_points, centers, sigma):
+    """
+    Helper function for building static bias functions for
+    SamplingProject and derived classes.
+
+    Parameters
+    ----------
+    grid_points : ndarray
+        Array of grid values at which bias potential should be
+        calculated.
+    centers : ndarray
+        Array of hill centers deposited at each bias stride.
+    sigma : float
+        Hill width for CV of interest.
+
+    Returns
+    -------
+    bias_grid : ndarray
+        Value of bias contributed by each hill at each grid point.
+    """
+    dist_from_center = grid_points - centers
+    square = np.square(dist_from_center)
+    bias_grid = np.exp(-square / (2 * sigma * sigma))
+    return bias_grid
+
+
 def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
     """
 
@@ -208,11 +234,3 @@ class MetaDProject(SamplingProject):
 
 class PBMetaDProject(SamplingProject):
     pass
-
-
-def get_hills(grid_points, centers, sigma):
-    dist_from_center = grid_points - centers
-    square = np.square(dist_from_center)
-    exp = np.exp(-square / (2 * sigma * sigma))
-    return exp
-
