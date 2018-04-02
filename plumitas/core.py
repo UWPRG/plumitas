@@ -1,7 +1,16 @@
+import glob
 import os
 import re
 
+import numpy as np
 import pandas as pd
+
+
+"""
+##################################
+#### READ PLUMED OUTPUT FILES ####
+##################################
+"""
 
 
 def read_colvar(filename='COLVAR', multi=0, unbiased=False):
@@ -68,7 +77,16 @@ def read_hills(filename='HILLS'):
     df : Pandas DataFrame
         CVs and bias as columns, time as index.
     """
-    return read_colvar(filename)
+    # find all files matching filename
+    all_hills = filename + '*'
+    hills_names = glob.glob(all_hills)
+
+    # parse each HILLS file with basic read_colvar call
+    hills_frames = [read_colvar(hill_file)
+                    for hill_file in hills_names]
+
+    # return dictionary of HILLS dataframes with CV name as key
+    return dict([(df.columns[0], df) for df in hills_frames])
 
 
 def parse_bias(filename='plumed.dat', method=None):
@@ -115,3 +133,108 @@ def parse_bias(filename='plumed.dat', method=None):
     bias_args = dict(arguments)
 
     return bias_args
+
+
+def get_hills(grid_points, centers, sigma):
+    """
+    Helper function for building static bias functions for
+    SamplingProject and derived classes.
+
+    Parameters
+    ----------
+    grid_points : ndarray
+        Array of grid values at which bias potential should be
+        calculated.
+    centers : ndarray
+        Array of hill centers deposited at each bias stride.
+    sigma : float
+        Hill width for CV of interest.
+
+    Returns
+    -------
+    bias_grid : ndarray
+        Value of bias contributed by each hill at each grid point.
+    """
+    dist_from_center = grid_points - centers
+    square = np.square(dist_from_center)
+    bias_grid = np.exp(-square / (2 * sigma * sigma))
+    return bias_grid
+
+
+def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
+    """
+
+    High-level function to read in all files associated with a Plumed
+    enhanced sampling project. **kwargs supplied since different project
+    types will be instantiated with different arguments.
+
+    Parameters
+    ----------
+    colvar : string
+        Name of the COLVAR file to read in.
+    hills : string
+        Name of the HILLS file to read in.
+    method : string
+        Name of enhanced sampling method used to bias the simulation.
+        Supported methods will include "MetaD", "PBMetaD", and others.
+        If the default None value is passed, plumitas will try to
+        create
+
+    Returns
+    -------
+    project : plumitas.SamplingProject
+        Project base class, or subclass if 'method' is specified.
+    """
+    if not method:
+        return SamplingProject(colvar, hills, **kwargs)
+
+    if method == 'MetaD':
+        return MetaDProject(colvar, hills, **kwargs)
+    elif method == 'PBMetaD':
+        return PBMetaDProject(colvar, hills, **kwargs)
+
+    raise KeyError('Sorry, the "{}" method is not yet supported.'
+                   .format(method))
+
+
+"""
+###############################
+#### CORE PLUMITAS CLASSES ####
+###############################
+"""
+
+
+class SamplingProject:
+    def __init__(self, colvar, hills, multi=False):
+        self.method = None
+        self.colvar = read_colvar(colvar, multi)
+        self.hills = read_hills(hills)
+        self.traj = None
+        self.biased_CVs = [CV for CV in self.hills]
+        self.static_bias = {}
+
+    def reconstruct_bias_potential(self, sigma, grid_min, grid_max):
+        if not self.biased_CVs:
+            print('self.biased_CVs not set.')
+            return
+
+        for CV in self.hills:
+            n_bins = 5 * (grid_max - grid_min) / sigma
+            grid = np.linspace(grid_min, grid_max, num=n_bins)
+
+            s_i = self.hills[CV][CV].values
+            s_i = s_i.reshape(len(s_i), 1)
+            w_i = self.hills[CV]['height'].values
+            w_i = w_i.reshape(len(w_i), 1)
+
+            hill_values = get_hills(grid, s_i, sigma)
+
+            self.static_bias[CV] = sum(w_i * hill_values)
+
+
+class MetaDProject(SamplingProject):
+    pass
+
+
+class PBMetaDProject(SamplingProject):
+    pass
