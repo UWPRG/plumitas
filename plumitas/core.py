@@ -1,4 +1,5 @@
 import os
+import re
 
 import pandas as pd
 
@@ -68,3 +69,49 @@ def read_hills(filename='HILLS'):
         CVs and bias as columns, time as index.
     """
     return read_colvar(filename)
+
+
+def parse_bias(filename='plumed.dat', method=None):
+    """
+    Function that takes experimental data and gives us the
+    dependent/independent variables for analysis.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the plumed input file used for enhanced sampling run.
+    method : string
+        Name of bias method used during
+    Returns
+    -------
+    bias_args : dict
+        Dictionary of key: value pairs from the plumed.dat file. Will
+        facilitate automatic reading of parameter reading once
+        core.SamplingProject class is implemented.
+    """
+    if not method:
+        print('Parser requires method to identify biased CVs. '
+              'Please retry with valid method arg.')
+        return
+
+    # read input file into string
+    full_path = os.path.abspath(filename)
+    input_string = ''
+    with open(full_path) as input_file:
+        for line in input_file:
+            input_string += line
+
+    # isolate bias section
+    method = method.upper()
+    bias_string = input_string.split(method)[1].lower()
+
+    # use regex to create dictionary of arguments
+    arguments = (re.findall(r'\w+=".+?"', bias_string)
+                 + re.findall(r'\w+=[\S.]+', bias_string))
+
+    # partition each match at '='
+    arguments = [(m.split('=')[0], m.split('=')[1].split(','))
+                 for m in arguments]
+    bias_args = dict(arguments)
+
+    return bias_args
