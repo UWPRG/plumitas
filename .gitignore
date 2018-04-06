@@ -11,3 +11,4 @@ build/
 .idea/
 build_dist.sh
 .pytest_cache/
+plumitas/dev_data
