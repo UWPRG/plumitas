@@ -221,7 +221,8 @@ def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
 
 def get_float(string):
     """
-    Silly helper function in case grid boundaries are pi.
+    Helper function in case grid boundaries are pi.
+
     Parameters
     ----------
     string : string
@@ -248,7 +249,7 @@ def get_float(string):
 
 class SamplingProject:
     """
-    Base class for management and analysis of enhanced sampling project.
+    Base class for management and analysis of an enhanced sampling project.
     """
 
     def __init__(self, colvar, hills, input_file=None,
@@ -266,16 +267,56 @@ class SamplingProject:
         self.biased_CVs = {CV: GridParameters(
             sigma=get_float(self.bias_params['sigma'][idx]),
             grid_min=get_float(self.bias_params['grid_min'][idx]),
+            grid_max=get_float(self.bias_params['grid_max'][idx])
+        )
+            for idx, CV in enumerate(self.bias_params['arg'])
+        }
+        self.periodic_CVs = [CV for CV in self.biased_CVs
+                             if self.biased_CVs[CV].grid_max == np.pi]
+        if 'temp' in self.bias_params.keys():
+            self.temp = self.bias_params['temp']
+
+    def get_bias_params(self, input_file, bias_type):
+        """
+        Method to grab bias parameters incase user forgot to supply plumed.dat
+        or input file wasn't automatically identified in the working directory.
+
+        Parameters
+        ----------
+        input_file : string
+            Relative path to PLUMED input file. Most commonly called plumed.dat.
+        bias_type : string
+            String associated with biasing method used for enhanced sampling.
+            Currently only "MetaD" and "PBMetaD" supported (case insensitive).
+
+        Returns
+        -------
+        None
+
+        """
+        # if input file supplied, grab arguments from bias section
+        self.bias_params = parse_bias(input_file, bias_type)
+        self.biased_CVs = {CV: GridParameters(
+            sigma=get_float(self.bias_params['sigma'][idx]),
+            grid_min=get_float(self.bias_params['grid_min'][idx]),
             grid_max=get_float(self.bias_params['grid_max'][idx]),
         )
             for idx, CV in enumerate(self.bias_params['arg'])
         }
         self.periodic_CVs = [CV for CV in self.biased_CVs
                              if self.biased_CVs[CV].grid_max == np.pi]
-        # self.temp = self.bias_params['temp']
+        if 'temp' in self.bias_params.keys():
+            self.temp = self.bias_params['temp']
 
 
 class MetaDProject(SamplingProject):
+    def __init__(self, colvar, hills, input_file=None,
+                 bias_type='MetaD', multi=False):
+        super(MetaDProject, self).__init__(colvar, hills,
+                                           input_file=input_file,
+                                           bias_type=bias_type,
+                                           multi=multi)
+        self.method = 'MetaD'
 
     def reconstruct_bias_potential(self):
         if not self.biased_CVs:
@@ -324,9 +365,16 @@ class MetaDProject(SamplingProject):
 
             self.static_bias[CV] = pd.Series(bias_potential,
                                              index=grid)
-
+            
 
 class PBMetaDProject(SamplingProject):
+    def __init__(self, colvar, hills, input_file=None,
+                 bias_type='PBMetaD', multi=False):
+        super(PBMetaDProject, self).__init__(colvar, hills,
+                                             input_file=input_file,
+                                             bias_type=bias_type,
+                                             multi=multi)
+        self.method = 'PBMetaD'
 
     def reconstruct_bias_potential(self):
         if not self.biased_CVs:
