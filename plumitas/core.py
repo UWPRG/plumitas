@@ -345,7 +345,7 @@ class MetaDProject(SamplingProject):
                 bins = get_float(self.bias_params['grid_bin'])
                 slicing = get_float(self.bias_params['slicing'])
                 slice_bins = (grid_max - grid_min) / slicing
-                n_bins = min(bins, slice_bins)
+                n_bins = max(bins, slice_bins)
             elif ('grid_slicing' in self.bias_params.keys()
                   and 'grid_bin' not in self.bias_params.keys()):
                 slicing = get_float(self.bias_params['slicing'])
@@ -365,7 +365,7 @@ class MetaDProject(SamplingProject):
 
             self.static_bias[CV] = pd.Series(bias_potential,
                                              index=grid)
-            
+
 
 class PBMetaDProject(SamplingProject):
     def __init__(self, colvar, hills, input_file=None,
