@@ -1,11 +1,13 @@
 import glob
 import os
 import re
+from collections import namedtuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from collections import namedtuple
+import plumitas as plm
 
 GridParameters = namedtuple('GridParameters',
                             ['sigma', 'grid_min', 'grid_max'])
@@ -317,6 +319,7 @@ class MetaDProject(SamplingProject):
                                            bias_type=bias_type,
                                            multi=multi)
         self.method = 'MetaD'
+        self.temp = 300  # BS placeholder. forgive me, science for i have sinned.
 
     def reconstruct_bias_potential(self):
         if not self.biased_CVs:
@@ -411,23 +414,53 @@ class PBMetaDProject(SamplingProject):
 
             self.static_bias[CV] = pd.Series(bias_potential,
                                              index=grid)
+            return
 
+    def weight_frames(self, temp=None):
+        """
+        Assign frame weights using the Torrie and Valleau reweighting
+        method from a quasi-static bias potential. Adds a 'weight' column
+        to self.colvar.
 
-############################################
-# Junk to test with
-############################################
-hills_files = 'data/belfast-6/Exercise_1/HILLS'
-colvar_files = 'data/belfast-6/Exercise_1/COLVAR'
-plumed_file = 'data/belfast-6/Exercise_1/plumed.dat'
+        Parameters
+        ----------
+        temp : float, None
+            If self.temp exists, the user does not need to supply a temp
+            because self.temp will take it's place anyway. If self.temp does
+            not exist, temp must be supplied in the method call or an error
+            will be printed with no furhter action.
 
-project = load_project(colvar_files, hills_files, method='metad',
-                       input_file=plumed_file, bias_type='metad')
+        Returns
+        -------
+        None
+        """
+        if not self.static_bias:
+            print('Torrie-Valleau reweighting requires a quasi static '
+                  'bias funciton in each CV dimension. Please try '
+                  'reconstruct_bias_potential before weight_frames.')
+            return
 
-project.reconstruct_bias_potential()
-#
-import matplotlib.pyplot as plt
+        if self.temp:
+            temp = get_float(self.temp[0])
 
-plt.plot(-project.static_bias['phi'])
-# plt.plot(-project.static_bias['psi'])
+        if not temp:
+            print('Temp not parsed from PLUMED input file. ')
 
-plt.show()
+        k = 8.314e-3
+        beta = 1 / (temp * k)
+
+        bias_df = pd.DataFrame(index=self.colvar.index)
+        for CV in self.static_bias.keys():
+            cut_indices = pd.cut(self.colvar[CV].values,
+                                 self.static_bias[CV].index,
+                                 labels=self.static_bias[CV].index[1:])
+
+            bias_df[CV] = np.exp(
+                -self.static_bias[CV][cut_indices].values * beta
+            )
+
+        pb_potential = -np.log(np.sum(bias_df, axis=1)) / beta
+        weight = np.exp(beta * pb_potential)
+
+        self.colvar['weight'] = weight / np.sum(weight)
+        return
