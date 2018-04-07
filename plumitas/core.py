@@ -400,6 +400,19 @@ class PBMetaDProject(SamplingProject):
                 periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
+            if ('grid_slicing' in self.bias_params.keys()
+                    and 'grid_bin' in self.bias_params.keys()):
+                bins = get_float(self.bias_params['grid_bin'])
+                slicing = get_float(self.bias_params['slicing'])
+                slice_bins = (grid_max - grid_min) / slicing
+                n_bins = max(bins, slice_bins)
+            elif ('grid_slicing' in self.bias_params.keys()
+                  and 'grid_bin' not in self.bias_params.keys()):
+                slicing = get_float(self.bias_params['slicing'])
+                n_bins = (grid_max - grid_min) / slicing
+            elif ('grid_bin' in self.bias_params.keys()
+                  and 'grid_slicing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'])
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV][CV].values
@@ -464,3 +477,20 @@ class PBMetaDProject(SamplingProject):
 
         self.colvar['weight'] = weight / np.sum(weight)
         return
+
+############################################
+# Junk to test with
+############################################
+
+
+hills_files = 'data/belfast-6/Exercise_1/HILLS'
+colvar_files = 'data/belfast-6/Exercise_1/COLVAR'
+plumed_file = 'data/belfast-6/Exercise_1/plumed.dat'
+
+project = load_project(colvar_files, hills_files, method='metad',
+                       input_file=plumed_file, bias_type='metad',
+                       multi=False)
+
+project.reconstruct_bias_potential()
+project.weight_frames()
+
