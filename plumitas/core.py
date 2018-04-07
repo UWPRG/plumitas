@@ -89,6 +89,9 @@ def read_hills(filename='HILLS'):
     hills_frames = [read_colvar(hill_file)
                     for hill_file in hills_names]
 
+    if len(hills_frames) == 1:
+        return hills_frames[0]
+
     # return dictionary of HILLS dataframes with CV name as key
     return dict([(df.columns[0], df) for df in hills_frames])
 
@@ -142,7 +145,7 @@ def parse_bias(filename='plumed.dat', bias_type=None):
     return bias_args
 
 
-def sum_hills(grid_points, hill_centers, sigma):
+def sum_hills(grid_points, hill_centers, sigma, periodic=False):
     """
     Helper function for building static bias functions for
     SamplingProject and derived classes.
@@ -156,6 +159,8 @@ def sum_hills(grid_points, hill_centers, sigma):
         Array of hill centers deposited at each bias stride.
     sigma : float
         Hill width for CV of interest.
+    periodic : bool
+        True if CV is periodic, otherwise False.
 
     Returns
     -------
@@ -163,8 +168,16 @@ def sum_hills(grid_points, hill_centers, sigma):
         Value of bias contributed by each hill at each grid point.
     """
     dist_from_center = grid_points - hill_centers
+    square = dist_from_center * dist_from_center
+
+    if periodic:
+        # can probably do something smarter than this!
+        neg_dist = np.abs(dist_from_center) - (grid_points[-1] - grid_points[0])
+        neg_square = neg_dist * neg_dist
+        square = np.minimum(square, neg_square)
+
     bias_grid = np.exp(
-        -(dist_from_center * dist_from_center) / (2 * sigma * sigma)
+        -square / (2 * sigma * sigma)
     )
     return bias_grid
 
@@ -195,6 +208,12 @@ def load_project(colvar='COLVAR', hills='HILLS', method=None, **kwargs):
     """
     if not method:
         return SamplingProject(colvar, hills, **kwargs)
+
+    if method.upper() == 'METAD':
+        return MetaDProject(colvar, hills, **kwargs)
+
+    if method.upper() == 'PBMETAD':
+        return PBMetaDProject(colvar, hills, **kwargs)
 
     raise KeyError('Sorry, the "{}" method is not yet supported.'
                    .format(method))
@@ -231,6 +250,7 @@ class SamplingProject:
     """
     Base class for management and analysis of enhanced sampling project.
     """
+
     def __init__(self, colvar, hills, input_file=None,
                  bias_type=None, multi=False):
         self.method = None
@@ -241,16 +261,21 @@ class SamplingProject:
 
         if not input_file:
             return
-
+        # if input file supplied, grab arguments from bias section
         self.bias_params = parse_bias(input_file, bias_type)
         self.biased_CVs = {CV: GridParameters(
             sigma=get_float(self.bias_params['sigma'][idx]),
             grid_min=get_float(self.bias_params['grid_min'][idx]),
-            grid_max=get_float(self.bias_params['grid_max'][idx])
+            grid_max=get_float(self.bias_params['grid_max'][idx]),
         )
             for idx, CV in enumerate(self.bias_params['arg'])
         }
-        self.temp = self.bias_params['temp'][0]
+        self.periodic_CVs = [CV for CV in self.biased_CVs
+                             if self.biased_CVs[CV].grid_max == np.pi]
+        # self.temp = self.bias_params['temp']
+
+
+class MetaDProject(SamplingProject):
 
     def reconstruct_bias_potential(self):
         if not self.biased_CVs:
@@ -263,54 +288,98 @@ class SamplingProject:
                       ' used to bias {}.'.format(CV))
                 continue
 
-            sigma = self.biased_CVs[CV].sigma
-            grid_min = self.biased_CVs[CV].grid_min
-            grid_max = self.biased_CVs[CV].grid_max
+            cv_tuple = self.biased_CVs[CV]
+            sigma = cv_tuple.sigma
+            grid_min = cv_tuple.grid_min
+            grid_max = cv_tuple.grid_max
+
+            periodic = False
+            # check for angle
+            if CV in self.periodic_CVs:
+                periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
+            if ('grid_slicing' in self.bias_params.keys()
+                    and 'grid_bin' in self.bias_params.keys()):
+                bins = get_float(self.bias_params['grid_bin'])
+                slicing = get_float(self.bias_params['slicing'])
+                slice_bins = (grid_max - grid_min) / slicing
+                n_bins = min(bins, slice_bins)
+            elif ('grid_slicing' in self.bias_params.keys()
+                  and 'grid_bin' not in self.bias_params.keys()):
+                slicing = get_float(self.bias_params['slicing'])
+                n_bins = (grid_max - grid_min) / slicing
+            elif ('grid_bin' in self.bias_params.keys()
+                  and 'grid_slicing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'])
+
             grid = np.linspace(grid_min, grid_max, num=n_bins)
+            s_i = self.hills[CV].values
+            w_i = self.hills['height'].values
 
-            s_i = self.hills[CV][CV].values
             s_i = s_i.reshape(len(s_i), 1)
-            w_i = self.hills[CV]['height'].values
             w_i = w_i.reshape(len(w_i), 1)
-
-            hill_values = sum_hills(grid, s_i, sigma)
+            hill_values = sum_hills(grid, s_i, sigma, periodic)
             bias_potential = sum(w_i * hill_values)
 
             self.static_bias[CV] = pd.Series(bias_potential,
                                              index=grid)
 
-        # now combine if multidimensional bias was added
-        # if len(self.biased_CVs) < 2:
-        #     return
-        #
-        # k = 8.314e-3
-        # beta = 1 / (self.temp * k)
-        #
-        # # TODO: add weight from all CVs based on values in self.colvar
-        # pre_log_weight = 0  # should actually be array with d = # frames
-        # for CV in self.biased_CVs:
-        #     pre_log_weight += np.exp(-self.static_bias[CV] * beta)
-
-        # for each time step: get value of each 1D bias potential.
-        # add these based on the PBMetaD equation.
-
-    # def get_frame_weights(self):
-    #     if not self.static_bias:
-    #         print('Missing self.static_bias. Please try '
-    #               'self.reconstruct_bias_potential first.')
-    #         return
-    #
-    #     w = np.exp(beta * df.loc[:, static_bias])
-    #     df['weight'] = w / w.sum()
-    #
-    #     self.colvar['frame_weight'] =
-
-
-class MetaDProject(SamplingProject):
-    pass
-
 
 class PBMetaDProject(SamplingProject):
-    pass
+
+    def reconstruct_bias_potential(self):
+        if not self.biased_CVs:
+            print('self.biased_CVs not set.')
+            return
+
+        for CV in self.biased_CVs:
+            if not self.biased_CVs[CV].sigma:
+                print('ERROR: please set sigma and grid edges'
+                      ' used to bias {}.'.format(CV))
+                continue
+
+            cv_tuple = self.biased_CVs[CV]
+            sigma = cv_tuple.sigma
+            grid_min = cv_tuple.grid_min
+            grid_max = cv_tuple.grid_max
+            periodic = False
+            # check for angle
+            if CV in self.periodic_CVs:
+                periodic = True
+
+            n_bins = 5 * (grid_max - grid_min) / sigma
+
+            grid = np.linspace(grid_min, grid_max, num=n_bins)
+            s_i = self.hills[CV][CV].values
+            w_i = self.hills[CV]['height'].values
+
+            # reshape for broadcasting
+            s_i = s_i.reshape(len(s_i), 1)
+            w_i = w_i.reshape(len(w_i), 1)
+
+            hill_values = sum_hills(grid, s_i, sigma, periodic)
+            bias_potential = sum(w_i * hill_values)
+
+            self.static_bias[CV] = pd.Series(bias_potential,
+                                             index=grid)
+
+
+############################################
+# Junk to test with
+############################################
+hills_files = 'data/belfast-6/Exercise_1/HILLS'
+colvar_files = 'data/belfast-6/Exercise_1/COLVAR'
+plumed_file = 'data/belfast-6/Exercise_1/plumed.dat'
+
+project = load_project(colvar_files, hills_files, method='metad',
+                       input_file=plumed_file, bias_type='metad')
+
+project.reconstruct_bias_potential()
+#
+import matplotlib.pyplot as plt
+
+plt.plot(-project.static_bias['phi'])
+# plt.plot(-project.static_bias['psi'])
+
+plt.show()
