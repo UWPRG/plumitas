@@ -431,6 +431,16 @@ class MetaDProject(SamplingProject):
         self.colvar['weight'] = weight / np.sum(weight)
         return
 
+    def potential_of_mean_force(self, CV):
+        w_i = self.hills['height'].values
+        w_i = w_i.reshape(len(w_i), 1)
+        hill_weights = w_i * -self.static_bias[CV]
+
+        bias_potential = hill_weights.sum(axis=0)
+
+        plt.plot(bias_potential)
+        return
+
 
 class PBMetaDProject(SamplingProject):
     def __init__(self, colvar, hills, input_file=None,
