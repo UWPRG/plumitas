@@ -359,15 +359,76 @@ class MetaDProject(SamplingProject):
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV].values
-            w_i = self.hills['height'].values
 
             s_i = s_i.reshape(len(s_i), 1)
-            w_i = w_i.reshape(len(w_i), 1)
             hill_values = sum_hills(grid, s_i, sigma, periodic)
-            bias_potential = sum(w_i * hill_values)
+            # bias_potential = sum(hill_values)/2.5
 
-            self.static_bias[CV] = pd.Series(bias_potential,
-                                             index=grid)
+            self.static_bias[CV] = pd.DataFrame(hill_values,
+                                                columns=grid,
+                                                index=self.hills[CV].index)
+
+        return
+
+    def weight_frames(self, temp=None):
+        """
+        Assign frame weights using the Torrie and Valleau reweighting
+        method from a quasi-static bias potential. Adds a 'weight' column
+        to self.colvar.
+
+        Parameters
+        ----------
+        temp : float, None
+            If self.temp exists, the user does not need to supply a temp
+            because self.temp will take it's place anyway. If self.temp does
+            not exist, temp must be supplied in the method call or an error
+            will be printed with no furhter action.
+
+        Returns
+        -------
+        None
+        """
+        if not self.static_bias:
+            print('Torrie-Valleau reweighting requires a quasi static '
+                  'bias funciton in each CV dimension. Please try '
+                  'reconstruct_bias_potential before weight_frames.')
+            return
+
+        if self.temp:
+            temp = get_float(self.temp)
+
+        if not temp:
+            print('Temp not parsed from PLUMED input file. ')
+
+        k = 8.314e-3
+        beta = 1 / (temp * k)
+
+        bias_df = pd.DataFrame(columns=self.biased_CVs,
+                               index=self.colvar.index)
+
+        for CV in self.static_bias.keys():
+            cut_indices = pd.cut(self.colvar[CV].values,
+                                 self.static_bias[CV].columns,
+                                 labels=self.static_bias[CV].columns[1:])
+
+            bias_df[CV] = cut_indices
+        test = bias_df.drop_duplicates()
+
+        w_i = self.hills['height'].values
+
+        for t, row in test.iterrows():
+            weights = np.ones(len(self.hills))
+            for CV in self.static_bias.keys():
+                weights *= self.static_bias[CV][row[CV]].values
+
+            static_bias = np.sum(w_i * weights)
+            bias_df.loc[(bias_df['phi'] == row['phi'])
+                        & (bias_df['psi'] == row['psi']),
+                        'static_bias'] = static_bias
+
+        weight = np.exp(beta * bias_df['static_bias'])
+        self.colvar['weight'] = weight / np.sum(weight)
+        return
 
 
 class PBMetaDProject(SamplingProject):
@@ -427,7 +488,7 @@ class PBMetaDProject(SamplingProject):
 
             self.static_bias[CV] = pd.Series(bias_potential,
                                              index=grid)
-            return
+        return
 
     def weight_frames(self, temp=None):
         """
@@ -477,20 +538,3 @@ class PBMetaDProject(SamplingProject):
 
         self.colvar['weight'] = weight / np.sum(weight)
         return
-
-############################################
-# Junk to test with
-############################################
-
-
-hills_files = 'data/belfast-6/Exercise_1/HILLS'
-colvar_files = 'data/belfast-6/Exercise_1/COLVAR'
-plumed_file = 'data/belfast-6/Exercise_1/plumed.dat'
-
-project = load_project(colvar_files, hills_files, method='metad',
-                       input_file=plumed_file, bias_type='metad',
-                       multi=False)
-
-project.reconstruct_bias_potential()
-project.weight_frames()
-
