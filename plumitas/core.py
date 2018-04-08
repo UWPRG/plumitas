@@ -3,11 +3,9 @@ import os
 import re
 from collections import namedtuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import plumitas as plm
 
 GridParameters = namedtuple('GridParameters',
                             ['sigma', 'grid_min', 'grid_max'])
@@ -174,7 +172,8 @@ def sum_hills(grid_points, hill_centers, sigma, periodic=False):
 
     if periodic:
         # can probably do something smarter than this!
-        neg_dist = np.abs(dist_from_center) - (grid_points[-1] - grid_points[0])
+        neg_dist = (np.abs(dist_from_center)
+                    - (grid_points[-1] - grid_points[0]))
         neg_square = neg_dist * neg_dist
         square = np.minimum(square, neg_square)
 
@@ -280,16 +279,19 @@ class SamplingProject:
 
     def get_bias_params(self, input_file, bias_type):
         """
-        Method to grab bias parameters incase user forgot to supply plumed.dat
-        or input file wasn't automatically identified in the working directory.
+        Method to grab bias parameters incase user forgot to supply
+        plumed.dat or input file wasn't automatically identified in
+        the working directory.
 
         Parameters
         ----------
         input_file : string
-            Relative path to PLUMED input file. Most commonly called plumed.dat.
+            Relative path to PLUMED input file. Most commonly called
+            plumed.dat.
         bias_type : string
-            String associated with biasing method used for enhanced sampling.
-            Currently only "MetaD" and "PBMetaD" supported (case insensitive).
+            String associated with biasing method used for enhanced
+            sampling. Currently only "MetaD" and "PBMetaD" supported
+            (case insensitive).
 
         Returns
         -------
@@ -319,7 +321,6 @@ class MetaDProject(SamplingProject):
                                            bias_type=bias_type,
                                            multi=multi)
         self.method = 'MetaD'
-        self.temp = 300  # BS placeholder. forgive me, science for i have sinned.
 
     def reconstruct_bias_potential(self):
         if not self.biased_CVs:
