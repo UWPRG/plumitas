@@ -95,7 +95,29 @@ def footer_to_string(footer):
     return ''.join(string)
 
 
-def generate_input(mdtraj_top, **kwargs):
+def generate_input(mdtraj_top, out_file='plumed.dat', **kwargs):
+    """
+    Converts an input dictionary object into a plumed run file.
+
+    Parameters
+    ----------
+    mdtraj_top : mdtraj.traj.Topology
+        A mdtraj Topology object generated from an input configuration
+        for your system. This allows automated atom selection with
+        simple VMD-style atom queries. This method is especially useful
+        when dealing with many collective variables and/or atom groups.
+    out_file : string
+        Name of file to be used with enhanced sampling simulation
+        in PLUMED. Default plumed.dat is common choice.
+    **kwargs : dict
+        Dictionary containing plumed input stored in header, groups,
+        cvs, bias, and footer sections. Eventually, these dicts will
+        be conveniently created with an interactive GUI.
+
+    Returns
+    -------
+    None
+    """
     plumed_dat = []
     if 'header' in kwargs.keys():
         plumed_dat.append(
@@ -120,6 +142,7 @@ def generate_input(mdtraj_top, **kwargs):
         )
 
     plumed_input = ''.join(plumed_dat)
-    # TODO: write output to file
-    print(plumed_input)
+
+    with open(out_file, 'w') as f:
+        f.write(plumed_input)
     return
