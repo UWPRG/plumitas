@@ -430,15 +430,58 @@ class MetaDProject(SamplingProject):
         self.colvar['weight'] = weight / np.sum(weight)
         return
 
-    def potential_of_mean_force(self, CV):
+    def potential_of_mean_force(self, collective_variables,
+                                mintozero=True, xlabel='CV',
+                                xlim=None,ylim=None):
+        """
+        Create PMF plot for one or several collective variables.
+
+        Parameters
+        ----------
+        collective_variables : list
+            List of CVs you'd like to plot. These should be supplied in
+            the form of a list of column names, or an instance of
+            pd.Index using df.columns
+        mintozero : bool, True
+            Determines whether or not to shift PMF so that the minimum
+            is at zero.
+        xlabel : string
+            Label for the x axis.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
+
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        plt.xlabel(xlabel)
+        plt.ylabel('A [kJ/mol]')
+
         w_i = self.hills['height'].values
         w_i = w_i.reshape(len(w_i), 1)
-        hill_weights = w_i * -self.static_bias[CV]
 
-        bias_potential = hill_weights.sum(axis=0)
+        # add lines for each CV
+        for cv in collective_variables:
+            hill_weights = w_i * self.static_bias[cv]
 
-        plt.plot(bias_potential)
-        return
+            static_bias = hill_weights.sum(axis=0)
+
+            free_energy = (- static_bias
+                           + static_bias.max())
+            if not mintozero:
+                free_energy = -static_bias
+
+            plt.plot(free_energy)
+
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        return ax
 
 
 class PBMetaDProject(SamplingProject):
@@ -549,12 +592,48 @@ class PBMetaDProject(SamplingProject):
         self.colvar['weight'] = weight / np.sum(weight)
         return
 
-    def potential_of_mean_force(self, CV):
-        w_i = self.hills['height'].values
-        w_i = w_i.reshape(len(w_i), 1)
-        hill_weights = w_i * -self.static_bias[CV]
+    def potential_of_mean_force(self, collective_variables,
+                                mintozero=True, xlabel='CV',
+                                xlim=None,ylim=None):
+        """
+        Create PMF plot for one or several collective variables.
 
-        bias_potential = hill_weights.sum(axis=0)
+        Parameters
+        ----------
+        collective_variables : list
+            List of CVs you'd like to plot. These should be supplied in
+            the form of a list of column names, or an instance of
+            pd.Index using df.columns
+        mintozero : bool, True
+            Determines whether or not to shift PMF so that the minimum
+            is at zero.
+        xlabel : string
+            Label for the x axis.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
 
-        plt.plot(bias_potential)
-        return
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        plt.xlabel(xlabel)
+        plt.ylabel('A [kJ/mol]')
+
+        # add lines for each CV
+        for cv in collective_variables:
+            free_energy = (- self.static_bias[cv]
+                           + self.static_bias[cv].max())
+            if not mintozero:
+                free_energy = -self.static_bias[cv]
+
+            plt.plot(free_energy)
+
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        return ax
