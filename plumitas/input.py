@@ -1,6 +1,3 @@
-import mdtraj as md
-
-
 def header_to_string(header, topology):
     string = []
     if header['restart']:
@@ -22,6 +19,15 @@ def header_to_string(header, topology):
 def groups_to_string(groups, topology):
     string = []
 
+    for key, group in groups.items():
+        label = f'{key}: '
+        action = ''.join(action for action in group.keys())
+        query = group[action]
+        atoms = topology.select(query)
+        a_str = ','.join(str(x) for x in atoms)
+        group_string = f'{label}{action.upper()} ATOMS={a_str}\n'
+        string.append(group_string)
+
     string.append('\n')
     return ''.join(string)
 
@@ -30,7 +36,7 @@ def cvs_to_string(cvs, topology):
     string = []
     for key, value in cvs.items():
         cv_type = ''.join(key for key in value.keys())
-        label = f'{key}: {cv_type.upper} '
+        label = f'{key}: {cv_type.upper()} '
         string.append(label)
 
         if cv_type == 'torsion':
@@ -46,12 +52,16 @@ def cvs_to_string(cvs, topology):
                 continue
 
             resid = value['torsion']['resid']
-            atom_lookup = {'phi': f'(residue {resid - 1} and name C) '
-                                  f'or (residue {resid} and name N CA C',
-                           'psi': f'(residue {resid} and name N CA C) '
-                                  f'or (residue {resid + 1} and name N',}
+            atom_lookup = {
+                'phi': '(residue {} and name C) '
+                       'or (residue {} and name N CA C)'
+                       ''.format((resid - 1), resid),
+                'psi': '(residue {} and name N CA C) '
+                       'or (residue {} and name N'
+                       ''.format(resid, (resid + 1))
+            }
 
-            query = atom_lookup(value['torsion']['angle'])
+            query = atom_lookup[value['torsion']['angle']]
             atoms = topology.select(query)
             a_str = ','.join(str(x) for x in atoms)
             string.append(f'{a_str}\n')
@@ -62,20 +72,30 @@ def cvs_to_string(cvs, topology):
 
 def bias_to_string(bias):
     string = []
+    method = ''.join(key for key in bias.keys())
+    string.append(f'{method.upper()} ...\n')
 
+    for key, value in bias[method].items():
+        string.append(f'{key.upper()}={value}\n')
+
+    string.append(f'... {method.upper()}\n')
     string.append('\n')
     return ''.join(string)
 
 
 def footer_to_string(footer):
     string = []
+    for action, arguments in footer.items():
+        string.append(f'{action.upper()} ')
+        for key, value in footer[action].items():
+            string.append(f'{key.upper()}={value} ')
+        string.append('\n')
 
     string.append('\n')
     return ''.join(string)
 
 
 def generate_input(mdtraj_top, **kwargs):
-    table, bonds = mdtraj_top.to_dataframe()
     plumed_dat = []
     if 'header' in kwargs.keys():
         plumed_dat.append(
@@ -101,4 +121,5 @@ def generate_input(mdtraj_top, **kwargs):
 
     plumed_input = ''.join(plumed_dat)
     # TODO: write output to file
+    print(plumed_input)
     return
