@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 import os.path as op
 
 import plumitas as plm
+import mdtraj as md
 
 data_path = op.join(plm.__path__[0], 'data')
 
@@ -77,3 +78,51 @@ def test_no_bias():
     project.get_bias_params(bin_space_plumed, bias_type='pbmetad')
     project.get_bias_params(bin_plumed, bias_type='metad')
     project.get_bias_params(bin_space_plumed, bias_type='metad')
+
+
+def test_input():
+    conf = op.join(data_path, "topology/conf.gro")
+    traj = md.load(conf)
+    top = traj.top
+
+    plumed = {'header': {'restart': False,
+                         'wholemolecules': ['protein', 'resname ALA']},
+
+              'groups': {'sidechain_com': {'com': 'sidechain and resname ALA'}
+                         },
+
+              'collective_variables': {
+                  'phi': {'torsion': {'angle': 'phi',
+                                      'resid': 2,
+                                      'atoms': '',
+                                      }
+                          },
+                  'psi': {'torsion': {'atoms': '7,9,15,17',
+                                      'angle': 'psi',
+                                      'resid': 2,
+                                      },
+                          },
+              },
+
+              'bias': {'pbmetad': {'label': 'pbmetad',
+                                   'arg': 'phi,psi',
+                                   'temp': '300',
+                                   'pace': '500',
+                                   'biasfactor': '15',
+                                   'height': '1.2',
+                                   'sigma': '0.35,0.35',
+                                   'grid_min': '-pi,-pi',
+                                   'grid_max': 'pi,pi',
+                                   'grid_spacing': '0.1,0.1',
+                                   'file': 'HILLS_phi,HILLS_psi'
+                                   }
+                       },
+
+              'footer': {'print': {'stride': '500',
+                                   'arg': 'phi,psi,pbmetad.bias',
+                                   'file': 'COLVAR'
+                                   },
+                         }
+              }
+
+    plm.generate_input(top, **plumed)
