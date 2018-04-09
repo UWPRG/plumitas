@@ -6,65 +6,74 @@ import plumitas as plm
 data_path = op.join(plm.__path__[0], 'data')
 
 
-def test_read_files():
+def test_pbmetad():
     """
     Testing function to convert of COLVAR file to pandas DataFrame.
 
     """
-    colvar_file = op.join(data_path, "COLVAR")
-    hills_file = op.join(data_path, "HILLS")
+    colvar_files = op.join(data_path, "pbmetad/COLVAR")
+    hills_files = op.join(data_path, "pbmetad/HILLS")
+    plumed_file = op.join(data_path, "pbmetad/plumed.dat")
 
-    colvar_df = plm.read_colvar(colvar_file)
-    hills_df = plm.read_hills(hills_file)
+    pbmetad = plm.load_project(colvar_files, hills_files,
+                               method='pbmetad')
+    # these things shouldn't work
+    pbmetad.free_energy_surface('phi', 'psi')
+    pbmetad.weight_frames()
 
-    assert colvar_df is not None
-    assert hills_df is not None
+    # these things should work
+    pbmetad.get_bias_params(plumed_file, bias_type='pbmetad')
+
+    pbmetad.reconstruct_bias_potential()
+    pbmetad.weight_frames()
+    axis_1 = pbmetad.potential_of_mean_force(['phi', 'psi'])
+    axis_2 = pbmetad.free_energy_surface('phi', 'psi',
+                                         weight='weight')
+
+    assert pbmetad.colvar['weight'] is not None
+    assert axis_1
+    assert axis_2
 
 
-def test_make_2d_free_energy_surface():
+def test_metad():
     """
-    Testing functions to reweight based on COLVAR from biased
-    simulations and generate 2D free energy surface.
-
-    """
-    number_of_replicas = 4
-
-    colvar_name = op.join(data_path, "COLVAR")
-    single_colvar_df = plm.read_colvar(colvar_name, unbiased=True)
-    # create colvar DataFrame with from multiple walkers
-    multi_colvar_df = plm.read_colvar(colvar_name,
-                                      multi=number_of_replicas,
-                                      unbiased=True)
-    # overwrite weight column above with real, normalized weights
-    plm.get_frame_weights(multi_colvar_df,
-                          static_bias='pb.bias', temp=300)
-
-    # send over to 2D FES method
-    axis = plm.make_2d_free_energy_surface(multi_colvar_df,
-                                           multi_colvar_df.columns[0],
-                                           multi_colvar_df.columns[1],
-                                           weight='weight',
-                                           temp=300)
-
-    assert (len(single_colvar_df.iloc[:, 0])
-            == len(multi_colvar_df.iloc[:, 0]) / number_of_replicas)
-    assert axis
-
-
-def test_potential_of_mean_force():
-    """
-    Testing functions to reweight based on COLVAR from biased
-    simulations and generate 1D potential of mean force.
+    Testing function to convert of COLVAR file to pandas DataFrame.
 
     """
-    colvar_file = op.join(data_path, "COLVAR")
-    colvar_df = plm.read_colvar(colvar_file)
-    # get normalized frame weights
-    plm.get_frame_weights(colvar_df,
-                          static_bias='pb.bias', temp=300)
-    axis = plm.potential_of_mean_force(colvar_df,
-                                       colvar_df.columns,
-                                       weight='weight',
-                                       temp=300)
+    colvar_files = op.join(data_path, "metad/COLVAR")
+    hills_files = op.join(data_path, "metad/HILLS")
+    plumed_file = op.join(data_path, "metad/plumed.dat")
 
-    assert axis
+    metad = plm.load_project(colvar_files, hills_files,
+                             method='metad')
+    # these things shouldn't work
+    metad.free_energy_surface('phi', 'psi')
+    metad.weight_frames()
+
+    # these things should work
+    metad.get_bias_params(plumed_file, bias_type='metad')
+
+    metad.reconstruct_bias_potential()
+    metad.weight_frames()
+    axis_1 = metad.potential_of_mean_force(['phi', 'psi'])
+    axis_2 = metad.free_energy_surface('phi', 'psi',
+                                       weight='weight')
+
+    assert metad.colvar['weight'] is not None
+    assert axis_1
+    assert axis_2
+
+
+def test_no_bias():
+    colvar_files = op.join(data_path, "pbmetad/COLVAR")
+    hills_files = op.join(data_path, "pbmetad/HILLS")
+    project = plm.load_project(colvar_files, hills_files)
+
+    # need to add tests to confirm that these are parsed as expected
+    bin_plumed = op.join(data_path, "plumed_bin.dat")
+    bin_space_plumed = op.join(data_path,
+                               "plumed_bin_space.dat")
+    project.get_bias_params(bin_plumed, bias_type='pbmetad')
+    project.get_bias_params(bin_space_plumed, bias_type='pbmetad')
+    project.get_bias_params(bin_plumed, bias_type='metad')
+    project.get_bias_params(bin_space_plumed, bias_type='metad')

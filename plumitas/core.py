@@ -117,6 +117,7 @@ def parse_bias(filename='plumed.dat', bias_type=None):
     if not filename:
         print('Bias parser requires filename. Please retry with '
               'valid filename.')
+        return
     if not bias_type:
         print('Parser requires method to identify biased CVs. '
               'Please retry with valid method arg.')
@@ -344,9 +345,9 @@ class SamplingProject:
         axes: matplotlib.AxesSubplot
         """
         if not weight:
-            raise ValueError('You must supply frame weights to generate '
-                             'the FES. Try using plumitas.get_frame_weights'
-                             ' first.')
+            print('You must supply frame weights to generate the FES. '
+                  'Try using plumitas.get_frame_weights first.')
+            return
 
         k = 8.314e-3
         beta = 1 / (self.temp * k)
@@ -406,7 +407,7 @@ class MetaDProject(SamplingProject):
             print('self.biased_CVs not set.')
             return
 
-        for CV in self.biased_CVs:
+        for idx, CV in enumerate(self.biased_CVs):
             if not self.biased_CVs[CV].sigma:
                 print('ERROR: please set sigma and grid edges'
                       ' used to bias {}.'.format(CV))
@@ -423,19 +424,19 @@ class MetaDProject(SamplingProject):
                 periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
-            if ('grid_slicing' in self.bias_params.keys()
+            if ('grid_spacing' in self.bias_params.keys()
                     and 'grid_bin' in self.bias_params.keys()):
-                bins = get_float(self.bias_params['grid_bin'])
-                slicing = get_float(self.bias_params['slicing'])
+                bins = get_float(self.bias_params['grid_bin'][idx])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 slice_bins = (grid_max - grid_min) / slicing
                 n_bins = max(bins, slice_bins)
-            elif ('grid_slicing' in self.bias_params.keys()
+            elif ('grid_spacing' in self.bias_params.keys()
                   and 'grid_bin' not in self.bias_params.keys()):
-                slicing = get_float(self.bias_params['slicing'])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 n_bins = (grid_max - grid_min) / slicing
             elif ('grid_bin' in self.bias_params.keys()
-                  and 'grid_slicing' not in self.bias_params.keys()):
-                n_bins = get_float(self.bias_params['grid_bin'])
+                  and 'grid_spacing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'][idx])
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV].values
@@ -511,7 +512,7 @@ class MetaDProject(SamplingProject):
 
     def potential_of_mean_force(self, collective_variables,
                                 mintozero=True, xlabel='CV',
-                                xlim=None,ylim=None):
+                                xlim=None, ylim=None):
         """
         Create PMF plot for one or several collective variables.
 
@@ -577,7 +578,7 @@ class PBMetaDProject(SamplingProject):
             print('self.biased_CVs not set.')
             return
 
-        for CV in self.biased_CVs:
+        for idx, CV in enumerate(self.biased_CVs):
             if not self.biased_CVs[CV].sigma:
                 print('ERROR: please set sigma and grid edges'
                       ' used to bias {}.'.format(CV))
@@ -593,19 +594,19 @@ class PBMetaDProject(SamplingProject):
                 periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
-            if ('grid_slicing' in self.bias_params.keys()
+            if ('grid_spacing' in self.bias_params.keys()
                     and 'grid_bin' in self.bias_params.keys()):
-                bins = get_float(self.bias_params['grid_bin'])
-                slicing = get_float(self.bias_params['slicing'])
+                bins = get_float(self.bias_params['grid_bin'][idx])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 slice_bins = (grid_max - grid_min) / slicing
                 n_bins = max(bins, slice_bins)
-            elif ('grid_slicing' in self.bias_params.keys()
+            elif ('grid_spacing' in self.bias_params.keys()
                   and 'grid_bin' not in self.bias_params.keys()):
-                slicing = get_float(self.bias_params['slicing'])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 n_bins = (grid_max - grid_min) / slicing
             elif ('grid_bin' in self.bias_params.keys()
-                  and 'grid_slicing' not in self.bias_params.keys()):
-                n_bins = get_float(self.bias_params['grid_bin'])
+                  and 'grid_spacing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'][idx])
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV][CV].values
@@ -672,7 +673,7 @@ class PBMetaDProject(SamplingProject):
 
     def potential_of_mean_force(self, collective_variables,
                                 mintozero=True, xlabel='CV',
-                                xlim=None,ylim=None):
+                                xlim=None, ylim=None):
         """
         Create PMF plot for one or several collective variables.
 
