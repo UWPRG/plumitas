@@ -275,7 +275,7 @@ class SamplingProject:
         self.periodic_CVs = [CV for CV in self.biased_CVs
                              if self.biased_CVs[CV].grid_max == np.pi]
         if 'temp' in self.bias_params.keys():
-            self.temp = self.bias_params['temp']
+            self.temp = get_float(self.bias_params['temp'][0])
 
     def get_bias_params(self, input_file, bias_type):
         """
@@ -310,7 +310,7 @@ class SamplingProject:
         self.periodic_CVs = [CV for CV in self.biased_CVs
                              if self.biased_CVs[CV].grid_max == np.pi]
         if 'temp' in self.bias_params.keys():
-            self.temp = self.bias_params['temp']
+            self.temp = get_float(self.bias_params['temp'][0])
 
 
 class MetaDProject(SamplingProject):
@@ -395,7 +395,7 @@ class MetaDProject(SamplingProject):
             return
 
         if self.temp:
-            temp = get_float(self.temp[0])
+            temp = get_float(self.temp)
 
         if not temp:
             print('Temp not parsed from PLUMED input file. ')
@@ -568,8 +568,7 @@ class PBMetaDProject(SamplingProject):
             return
 
         if self.temp:
-            temp = get_float(self.temp[0])
-
+            temp = get_float(self.temp)
         if not temp:
             print('Temp not parsed from PLUMED input file. ')
 
@@ -636,4 +635,82 @@ class PBMetaDProject(SamplingProject):
 
         plt.xlim(xlim)
         plt.ylim(ylim)
+        return ax
+
+    def free_energy_surface(self, x, y, weight=None, bins=50,
+                            clim=None, xlim=None, ylim=None,
+                            energy_cut=50):
+        """
+        Create a 2D FES from a COLVAR file with static 'pb.bias'. This function
+        will be modularized and generalized, but I wanted to include something
+        more exciting than reading colvar/hills files for the first PyPI cut.
+
+        Parameters
+        ----------
+        x : string
+            Name of one of the CVs (column name from df).
+        y : string
+            Name of one of the CVs (column name from df).
+        bins : int
+            Number of bins in each dimension to segment histogram.
+        temp : float
+            Temperature of simulation which generated Plumed file.
+        weight : str
+            Name of static bias column.
+        clim : int
+            Maximum free energy (in kJ/mol) for color bar.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
+
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        if not weight:
+            raise ValueError('You must supply frame weights to generate the FES.'
+                             'Try using plumitas.get_frame_weights first.')
+
+        k = 8.314e-3
+        beta = 1 / (self.temp * k)
+
+        # grab ndarray of values from df
+        x_data = self.colvar[x].values
+        y_data = self.colvar[y].values
+        w_data = self.colvar[weight].values
+
+        # create bin edges
+        x_edges = np.linspace(x_data.min(), x_data.max(), bins)
+        y_edges = np.linspace(y_data.min(), y_data.max(), bins)
+
+        # create weighted histogram, with weights converted to free energy
+        hist, x_edges, y_edges = np.histogram2d(x_data, y_data,
+                                                bins=(x_edges, y_edges),
+                                                weights=w_data)
+        hist = hist.T
+        hist = -np.log(hist) / beta
+        hist = np.nan_to_num(hist)
+
+        # shift minimum energy to 0
+        high_hist = hist > energy_cut
+        hist[high_hist] = energy_cut
+        hist = hist - hist.min()
+
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        # plot
+        plt.contourf(x_edges[1:], y_edges[1:], hist)
+        cbar = plt.colorbar()
+        plt.clim(0, clim)
+        plt.set_cmap('viridis')
+        cbar.ax.set_ylabel('A [kJ/mol]')
+        # add axis limits (if supplied) and labels
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.xlabel(x)
+        plt.ylabel(y)
+
         return ax
