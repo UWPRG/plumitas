@@ -5,7 +5,7 @@ from collections import namedtuple
 
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
 
 GridParameters = namedtuple('GridParameters',
                             ['sigma', 'grid_min', 'grid_max'])
@@ -117,6 +117,7 @@ def parse_bias(filename='plumed.dat', bias_type=None):
     if not filename:
         print('Bias parser requires filename. Please retry with '
               'valid filename.')
+        return
     if not bias_type:
         print('Parser requires method to identify biased CVs. '
               'Please retry with valid method arg.')
@@ -275,7 +276,7 @@ class SamplingProject:
         self.periodic_CVs = [CV for CV in self.biased_CVs
                              if self.biased_CVs[CV].grid_max == np.pi]
         if 'temp' in self.bias_params.keys():
-            self.temp = self.bias_params['temp']
+            self.temp = get_float(self.bias_params['temp'][0])
 
     def get_bias_params(self, input_file, bias_type):
         """
@@ -310,7 +311,86 @@ class SamplingProject:
         self.periodic_CVs = [CV for CV in self.biased_CVs
                              if self.biased_CVs[CV].grid_max == np.pi]
         if 'temp' in self.bias_params.keys():
-            self.temp = self.bias_params['temp']
+            self.temp = get_float(self.bias_params['temp'][0])
+
+    def free_energy_surface(self, x, y, weight=None, bins=50,
+                            clim=None, xlim=None, ylim=None,
+                            energy_cut=50):
+        """
+        Create a 2D FES from a COLVAR file with frame weights.
+
+        Parameters
+        ----------
+        x : string
+            Name of one of the CVs (column name from df).
+        y : string
+            Name of one of the CVs (column name from df).
+        bins : int
+            Number of bins in each dimension to segment histogram.
+        temp : float
+            Temperature of simulation which generated Plumed file.
+        weight : str
+            Name of static bias column.
+        clim : int
+            Maximum free energy (in kJ/mol) for color bar.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
+        energy_cut: float
+            Cut off to exclude very high free energy values
+            from histogram to help visualization.
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        if not weight:
+            print('You must supply frame weights to generate the FES. '
+                  'Try using plumitas.get_frame_weights first.')
+            return
+
+        k = 8.314e-3
+        beta = 1 / (self.temp * k)
+
+        # grab ndarray of values from df
+        x_data = self.colvar[x].values
+        y_data = self.colvar[y].values
+        w_data = self.colvar[weight].values
+
+        # create bin edges
+        x_edges = np.linspace(x_data.min(), x_data.max(), bins)
+        y_edges = np.linspace(y_data.min(), y_data.max(), bins)
+
+        # create weighted histogram, with weights converted to free energy
+        hist, x_edges, y_edges = np.histogram2d(x_data, y_data,
+                                                bins=(x_edges, y_edges),
+                                                weights=w_data)
+        hist = hist.T
+        hist = -np.log(hist) / beta
+        hist = np.nan_to_num(hist)
+
+        # shift minimum energy to 0
+        high_hist = hist > energy_cut
+        hist[high_hist] = energy_cut
+        hist = hist - hist.min()
+
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        # plot
+        plt.contourf(x_edges[1:], y_edges[1:], hist)
+        cbar = plt.colorbar()
+        plt.clim(0, clim)
+        plt.set_cmap('viridis')
+        cbar.ax.set_ylabel('A [kJ/mol]')
+        # add axis limits (if supplied) and labels
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.xlabel(x)
+        plt.ylabel(y)
+
+        return ax
 
 
 class MetaDProject(SamplingProject):
@@ -327,7 +407,7 @@ class MetaDProject(SamplingProject):
             print('self.biased_CVs not set.')
             return
 
-        for CV in self.biased_CVs:
+        for idx, CV in enumerate(self.biased_CVs):
             if not self.biased_CVs[CV].sigma:
                 print('ERROR: please set sigma and grid edges'
                       ' used to bias {}.'.format(CV))
@@ -344,26 +424,25 @@ class MetaDProject(SamplingProject):
                 periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
-            if ('grid_slicing' in self.bias_params.keys()
+            if ('grid_spacing' in self.bias_params.keys()
                     and 'grid_bin' in self.bias_params.keys()):
-                bins = get_float(self.bias_params['grid_bin'])
-                slicing = get_float(self.bias_params['slicing'])
+                bins = get_float(self.bias_params['grid_bin'][idx])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 slice_bins = (grid_max - grid_min) / slicing
                 n_bins = max(bins, slice_bins)
-            elif ('grid_slicing' in self.bias_params.keys()
+            elif ('grid_spacing' in self.bias_params.keys()
                   and 'grid_bin' not in self.bias_params.keys()):
-                slicing = get_float(self.bias_params['slicing'])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 n_bins = (grid_max - grid_min) / slicing
             elif ('grid_bin' in self.bias_params.keys()
-                  and 'grid_slicing' not in self.bias_params.keys()):
-                n_bins = get_float(self.bias_params['grid_bin'])
+                  and 'grid_spacing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'][idx])
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV].values
 
             s_i = s_i.reshape(len(s_i), 1)
             hill_values = sum_hills(grid, s_i, sigma, periodic)
-            # bias_potential = sum(hill_values)/2.5
 
             self.static_bias[CV] = pd.DataFrame(hill_values,
                                                 columns=grid,
@@ -431,6 +510,59 @@ class MetaDProject(SamplingProject):
         self.colvar['weight'] = weight / np.sum(weight)
         return
 
+    def potential_of_mean_force(self, collective_variables,
+                                mintozero=True, xlabel='CV',
+                                xlim=None, ylim=None):
+        """
+        Create PMF plot for one or several collective variables.
+
+        Parameters
+        ----------
+        collective_variables : list
+            List of CVs you'd like to plot. These should be supplied in
+            the form of a list of column names, or an instance of
+            pd.Index using df.columns
+        mintozero : bool, True
+            Determines whether or not to shift PMF so that the minimum
+            is at zero.
+        xlabel : string
+            Label for the x axis.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
+
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        plt.xlabel(xlabel)
+        plt.ylabel('A [kJ/mol]')
+
+        w_i = self.hills['height'].values
+        w_i = w_i.reshape(len(w_i), 1)
+
+        # add lines for each CV
+        for cv in collective_variables:
+            hill_weights = w_i * self.static_bias[cv]
+
+            static_bias = hill_weights.sum(axis=0)
+
+            free_energy = (- static_bias
+                           + static_bias.max())
+            if not mintozero:
+                free_energy = -static_bias
+
+            plt.plot(free_energy)
+
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        return ax
+
 
 class PBMetaDProject(SamplingProject):
     def __init__(self, colvar, hills, input_file=None,
@@ -446,7 +578,7 @@ class PBMetaDProject(SamplingProject):
             print('self.biased_CVs not set.')
             return
 
-        for CV in self.biased_CVs:
+        for idx, CV in enumerate(self.biased_CVs):
             if not self.biased_CVs[CV].sigma:
                 print('ERROR: please set sigma and grid edges'
                       ' used to bias {}.'.format(CV))
@@ -462,19 +594,19 @@ class PBMetaDProject(SamplingProject):
                 periodic = True
 
             n_bins = 5 * (grid_max - grid_min) / sigma
-            if ('grid_slicing' in self.bias_params.keys()
+            if ('grid_spacing' in self.bias_params.keys()
                     and 'grid_bin' in self.bias_params.keys()):
-                bins = get_float(self.bias_params['grid_bin'])
-                slicing = get_float(self.bias_params['slicing'])
+                bins = get_float(self.bias_params['grid_bin'][idx])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 slice_bins = (grid_max - grid_min) / slicing
                 n_bins = max(bins, slice_bins)
-            elif ('grid_slicing' in self.bias_params.keys()
+            elif ('grid_spacing' in self.bias_params.keys()
                   and 'grid_bin' not in self.bias_params.keys()):
-                slicing = get_float(self.bias_params['slicing'])
+                slicing = get_float(self.bias_params['grid_spacing'][idx])
                 n_bins = (grid_max - grid_min) / slicing
             elif ('grid_bin' in self.bias_params.keys()
-                  and 'grid_slicing' not in self.bias_params.keys()):
-                n_bins = get_float(self.bias_params['grid_bin'])
+                  and 'grid_spacing' not in self.bias_params.keys()):
+                n_bins = get_float(self.bias_params['grid_bin'][idx])
 
             grid = np.linspace(grid_min, grid_max, num=n_bins)
             s_i = self.hills[CV][CV].values
@@ -516,8 +648,7 @@ class PBMetaDProject(SamplingProject):
             return
 
         if self.temp:
-            temp = get_float(self.temp[0])
-
+            temp = get_float(self.temp)
         if not temp:
             print('Temp not parsed from PLUMED input file. ')
 
@@ -539,3 +670,49 @@ class PBMetaDProject(SamplingProject):
 
         self.colvar['weight'] = weight / np.sum(weight)
         return
+
+    def potential_of_mean_force(self, collective_variables,
+                                mintozero=True, xlabel='CV',
+                                xlim=None, ylim=None):
+        """
+        Create PMF plot for one or several collective variables.
+
+        Parameters
+        ----------
+        collective_variables : list
+            List of CVs you'd like to plot. These should be supplied in
+            the form of a list of column names, or an instance of
+            pd.Index using df.columns
+        mintozero : bool, True
+            Determines whether or not to shift PMF so that the minimum
+            is at zero.
+        xlabel : string
+            Label for the x axis.
+        xlim : tuple/list
+            Limits for x axis in plot (i.e. [x_min, x_max]).
+        ylim : tuple/list
+            Limits for y axis in plot (i.e. [y_min, y_max]).
+
+        Returns
+        -------
+        axes: matplotlib.AxesSubplot
+        """
+        # fresh AxesSubplot instance
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        plt.xlabel(xlabel)
+        plt.ylabel('A [kJ/mol]')
+
+        # add lines for each CV
+        for cv in collective_variables:
+            free_energy = (- self.static_bias[cv]
+                           + self.static_bias[cv].max())
+            if not mintozero:
+                free_energy = -self.static_bias[cv]
+
+            plt.plot(free_energy)
+
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        return ax

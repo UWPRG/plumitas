@@ -1,0 +1,28 @@
+# set up two variables for Phi and Psi dihedral angles
+phi: TORSION ATOMS=5,7,9,15
+psi: TORSION ATOMS=7,9,15,17
+#
+# Activate metadynamics in phi and psi
+# depositing a Gaussian every 500 time steps,
+# with height equal to 1.2 kJoule/mol,
+# and width 0.35 rad for both CVs.
+# The bias potential will be stored on a grid
+# with bin size equal to 0.1 rad for both CVs.
+# The boundaries of the grid are -pi and pi, for both CVs.
+#
+PBMETAD ...
+LABEL=pbmetad
+ARG=phi,psi
+PACE=500
+BIASFACTOR=15
+TEMP=300
+HEIGHT=1.2
+SIGMA=0.35,0.35
+FILE=HILLS_phi,HILLS_psi
+GRID_MIN=-pi,-pi
+GRID_MAX=pi,pi
+GRID_BIN=1000,1000
+... PBMETAD
+
+# monitor the two variables and the metadynamics bias potential
+PRINT STRIDE=500 ARG=phi,psi,pbmetad.bias FILE=COLVAR
