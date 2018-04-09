@@ -20,6 +20,7 @@ python:
 
 install:
 - travis_retry pip install $PIP_DEPS
+- travis_retry pip install numpy cython
 - travis_retry pip install -r requirements.txt
 - travis_retry pip install -e .
 
@@ -29,7 +30,7 @@ before_script: # configure a headless display to test plot generation
 - sleep 3 # give xvfb some time to start
 
 script:
-- flake8 --ignore N802,N806,W503 `find . -name \*.py | grep -v setup.py | grep -v version.py | grep -v __init__.py | grep -v /docs/`
+- flake8 --ignore N802,N806,W503,E126 `find . -name \*.py | grep -v setup.py | grep -v version.py | grep -v __init__.py | grep -v /docs/`
 - mkdir for_test
 - cd for_test
 - py.test --pyargs plumitas --cov-report term-missing --cov=plumitas
