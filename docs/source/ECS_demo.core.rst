@@ -1,7 +1,7 @@
-plumitas\.core
+ECS_demo\.core
 ==============
 
-.. automodule:: plumitas.core
+.. automodule:: ECS_demo.core
     :members:
     :undoc-members:
     :show-inheritance:
